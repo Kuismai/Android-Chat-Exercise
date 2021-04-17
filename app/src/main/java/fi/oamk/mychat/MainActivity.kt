@@ -1,12 +1,15 @@
 package fi.oamk.mychat
 
 import android.content.Context
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.renderscript.Sampler
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
+import android.view.Menu
+import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -77,9 +80,32 @@ class MainActivity : AppCompatActivity() {
         rcMessageList.adapter = MyAdapter(messages)
     }
 
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        val inflater = menuInflater
+        inflater.inflate(R.menu.app_menu,menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem) = when(item.itemId) {
+        R.id.settings -> {
+            this.showSettings()
+            true
+        } else -> {
+            super.onOptionsItemSelected(item)
+        }
+    }
+
     override fun onStart() {
         super.onStart()
-        loginDialog()
+        currentUser = auth.currentUser
+        if (currentUser == null) loginDialog()
+    }
+
+    fun showSettings() {
+        val intent = Intent(this, Settings::class.java).apply{
+            putExtra("currentUser",currentUser)
+        }
+        startActivity(intent)
     }
 
     fun loginDialog() {
