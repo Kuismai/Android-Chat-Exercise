@@ -2,6 +2,7 @@ package fi.oamk.mychat
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.renderscript.Sampler
@@ -14,6 +15,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,12 +28,14 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 
 class MainActivity : AppCompatActivity() {
 
     private val TAG: String = MainActivity::class.java.name
-    private lateinit var messages: ArrayList<String>
+    private lateinit var messages: ArrayList<Message>
     private lateinit var database: DatabaseReference
     private lateinit var edMessage: EditText
     private lateinit var rcMessageList: RecyclerView
@@ -47,7 +51,7 @@ class MainActivity : AppCompatActivity() {
         database = Firebase.database.reference
         auth = Firebase.auth
 
-        messages = arrayListOf()
+        messages = arrayListOf<Message>()
         rcMessageList = findViewById(R.id.messageList)
 
         edMessage.setOnKeyListener { v, keyCode, event ->
@@ -58,27 +62,41 @@ class MainActivity : AppCompatActivity() {
             return@setOnKeyListener false
         }
 
+
         val messageListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.value != null) {
-                    val messagesfromDatabase = (snapshot.value as HashMap<String, ArrayList<String>>).get("messages")
+                    val messagesFromFirebase =
+                        (snapshot.value as HashMap<String, ArrayList<Message>>).get("messages")
                     messages.clear()
-                    messagesfromDatabase?.forEach {
-                        if (it != null) messages.add(it)
+
+                    if (messagesFromFirebase != null) {
+                        for (i in 0..messagesFromFirebase.size - 1) {
+                            if (messagesFromFirebase.get(i) != null) {
+                                val message: Message = Message.from(messagesFromFirebase.get(i) as HashMap<String, String>)
+                                messages.add(message)
+                            }
+                        }
                     }
+
                     rcMessageList.adapter?.notifyDataSetChanged()
+                    rcMessageList.smoothScrollToPosition(rcMessageList.adapter!!.itemCount - 1)
                 }
+
             }
+
 
             override fun onCancelled(error: DatabaseError) {
                 Log.d("Chat", error.toString())
             }
+
+        }
+            database.addValueEventListener(messageListener)
+            rcMessageList.layoutManager = LinearLayoutManager(this)
+            rcMessageList.adapter = MyAdapter(messages)
         }
 
-        database.addValueEventListener(messageListener)
-        rcMessageList.layoutManager = LinearLayoutManager(this)
-        rcMessageList.adapter = MyAdapter(messages)
-    }
+
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         val inflater = menuInflater
@@ -150,11 +168,19 @@ class MainActivity : AppCompatActivity() {
                 }
     }
 
+
         fun addMessage() {
-            val newMessage = edMessage.text.toString()
+            val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm")
+            val newMessage: Message = Message(edMessage.text.toString(),
+                currentUser?.email.toString(),
+                formatter.format(LocalDateTime.now()))
             messages.add(newMessage)
+
             database.child("messages").setValue(messages)
             edMessage.setText("")
+
+            closeKeyboard()
+            rcMessageList.smoothScrollToPosition(rcMessageList.adapter!!.itemCount-1)
         }
 
         private fun closeKeyboard() {
